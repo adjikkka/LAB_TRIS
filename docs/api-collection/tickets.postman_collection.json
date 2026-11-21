@@ -1,0 +1,305 @@
+{
+  "info": {
+    "_postman_id": "b1a0c3e2-5d41-4f6a-9c7e-1a2b3c4d5e6f",
+    "name": "LAB_TRIS · Обращения жильцов общежития",
+    "description": "Коллекция запросов ЛР8 (REST) + вход ЛР11. Базовый URL — переменная baseUrl (http://localhost:5000).\n\nПорядок проверки: сначала «01 Вход» (комендант), скопировать значение token из ответа в переменную accessToken коллекции. Для запросов исполнителя — войти как santehnik и подставить {{executorToken}}.\n\nОжидаемые коды: 201 — создание, 400 — короткая тема, 404 — нет записи, 409 — нарушение правила процесса, 401 — нет входа, 403 — нет права.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "accessToken", "value": "" },
+    { "key": "executorToken", "value": "" },
+    { "key": "ticketId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "01 Вход (комендант)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"login\": \"komendant\",\n  \"password\": \"Passw0rd!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Ожидание: 200, в ответе token и user.role = Комендант. Скопируйте token в переменную accessToken (коллекция). Учебный логин и пароль — из README."
+      }
+    },
+    {
+      "name": "02 Вход (исполнитель)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"login\": \"santehnik\",\n  \"password\": \"Passw0rd!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Ожидание: 200. Скопируйте token в переменную executorToken — нужен для PATCH статуса от имени исполнителя."
+      }
+    },
+    {
+      "name": "03 Создание обращения (комендант) — 201",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Протекает кран в ванной\",\n  \"roomId\": 1,\n  \"description\": \"Капает кран, под раковиной собралась лужа\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets"]
+        },
+        "description": "Ожидание: 201. В теле ответа — id, number (ОБР-2026-…), status: New, assigneeUserId: null. Клиент присылает только title, roomId, description: id, number и статус задаёт сервер."
+      }
+    },
+    {
+      "name": "04 Создание с короткой темой — 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"abc\",\n  \"roomId\": 1,\n  \"description\": \"Проверка серверной валидации длины темы\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets"]
+        },
+        "description": "Ожидание: 400 ProblemDetails «Тема: от 5 до 80 символов». Не 500."
+      }
+    },
+    {
+      "name": "05 Создание без входа — 401",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Без заголовка авторизации\",\n  \"roomId\": 1,\n  \"description\": \"Проверка требования входа для создания\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets"]
+        },
+        "description": "Ожидание: 401 (ЛР11). Гость не создаёт обращения."
+      }
+    },
+    {
+      "name": "06 Список обращений — 200",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets"]
+        },
+        "description": "Ожидание: 200. Комендант видит все обращения; исполнитель — только назначенные на него. Пустой список — 200 и [], не 404."
+      }
+    },
+    {
+      "name": "07 Одна запись — 200",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "{{ticketId}}"]
+        },
+        "description": "Ожидание: 200 и поля записи. Переменная ticketId — номер из «03 Создание», чтобы сверить один и тот же id."
+      }
+    },
+    {
+      "name": "08 Несуществующий id — 404",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/999999",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "999999"]
+        },
+        "description": "Ожидание: 404 «Обращение не найдено». Не необработанная ошибка 500."
+      }
+    },
+    {
+      "name": "09 PATCH status без исполнителя — 409",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{executorToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"InProgress\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "{{ticketId}}", "status"]
+        },
+        "description": "Ожидание: 409 «Нельзя перевести в работу без назначенного исполнителя». ticketId должен указывать на обращение в статусе New без assigneeUserId (например, созданное в «03» до назначения)."
+      }
+    },
+    {
+      "name": "10 PATCH assignee (назначить сантехника) — 200",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assigneeUserId\": 2\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/assignee",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "{{ticketId}}", "assignee"]
+        },
+        "description": "Ожидание: 200, assigneeUserId = 2 (сантехник). Комендант назначает только в статусе New; повторное назначение — 409."
+      }
+    },
+    {
+      "name": "11 PATCH status → InProgress (исполнитель) — 200",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{executorToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"InProgress\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "{{ticketId}}", "status"]
+        },
+        "description": "Ожидание: 200, status = InProgress. Запрос выполняется под токеном сантехника, назначенного в «10». Чужой исполнитель получил бы 403."
+      }
+    },
+    {
+      "name": "12 PATCH status → Closed (исполнитель) — 200",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{executorToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"Closed\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "{{ticketId}}", "status"]
+        },
+        "description": "Ожидание: 200, status = Closed (после InProgress). Переход New → Closed напрямую запрещён — 409."
+      }
+    },
+    {
+      "name": "13 PATCH status InProgress (комендант) — 403",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"InProgress\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "{{ticketId}}", "status"]
+        },
+        "description": "Ожидание: 403 (ЛР11). Комендант не переводит обращение в работу — статус меняет исполнитель. Комендант может только отменить (Cancelled) обращение в статусе New."
+      }
+    },
+    {
+      "name": "14 PATCH assignee (исполнитель) — 403",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{executorToken}}", "type": "string" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assigneeUserId\": 3\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tickets/{{ticketId}}/assignee",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "tickets", "{{ticketId}}", "assignee"]
+        },
+        "description": "Ожидание: 403 (ЛР11). Исполнитель не назначает исполнителей."
+      }
+    }
+  ]
+}
